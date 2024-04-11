@@ -1,37 +1,36 @@
 #!/bin/bash
 
-# Function to transfer and run configure-host.sh script on a remote server
-configure_remote_server() {
-    local server_address="$1"
-    local hostname="$2"
-    local ip_address="$3"
-    local entry_name="$4"
-    local entry_ip="$5"
+# Set the remote server details
+server1_host="server1-mgmt"
+server1_user="remoteadmin"
+server2_host="server2-mgmt"
+server2_user="remoteadmin"
 
-    # Transfer configure-host.sh script to the remote server
-    scp configure-host.sh remoteadmin@"$server_address":/root
+# Set the desired configurations
+server1_name="loghost"
+server1_ip="192.168.16.3"
+server2_name="webhost"
+server2_ip="192.168.16.4"
 
-    # Run configure-host.sh script on the remote server
-    ssh remoteadmin@"$server_address" -- /root/configure-host.sh -name "$hostname" -ip "$ip_address" -hostentry "$entry_name" "$entry_ip"
-}
+# Check if verbose mode is enabled
+verbose=false
+if [ "$1" = "-verbose" ]; then
+    verbose=true
+fi
 
-# Update local /etc/hosts file
-update_local_hosts() {
-    local entry_name="$1"
-    local entry_ip="$2"
+# Transfer the configure-host.sh script to the remote servers
+scp configure-host.sh "$server1_user@$server1_host:/root"
+scp configure-host.sh "$server2_user@$server2_host:/root"
 
-    # Run configure-host.sh locally
-    ./configure-host.sh -hostentry "$entry_name" "$entry_ip"
-}
+# Run the configure-host.sh script on the remote servers
+if [ "$verbose" = true ]; then
+    ssh "$server1_user@$server1_host" -- /root/configure-host.sh -verbose -name "$server1_name" -ip "$server1_ip" -hostentry "$server2_name" "$server2_ip"
+    ssh "$server2_user@$server2_host" -- /root/configure-host.sh -verbose -name "$server2_name" -ip "$server2_ip" -hostentry "$server1_name" "$server1_ip"
+else
+    ssh "$server1_user@$server1_host" -- /root/configure-host.sh -name "$server1_name" -ip "$server1_ip" -hostentry "$server2_name" "$server2_ip"
+    ssh "$server2_user@$server2_host" -- /root/configure-host.sh -name "$server2_name" -ip "$server2_ip" -hostentry "$server1_name" "$server1_ip"
+fi
 
-# Configure server1-mgmt
-configure_remote_server "server1-mgmt" "loghost" "192.168.16.3" "webhost" "192.168.16.4"
-
-# Configure server2-mgmt
-configure_remote_server "server2-mgmt" "webhost" "192.168.16.4" "loghost" "192.168.16.3"
-
-# Update local /etc/hosts file
-update_local_hosts "loghost" "192.168.16.3"
-update_local_hosts "webhost" "192.168.16.4"
-
-exit 0
+# Update the local /etc/hosts file
+./configure-host.sh -hostentry "$server1_name" "$server1_ip"
+./configure-host.sh -hostentry "$server2_name" "$server2_ip"
